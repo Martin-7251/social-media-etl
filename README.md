@@ -46,7 +46,7 @@ Edit
 Tool                                                	Purpose
 Apache Airflow                                       	Workflow orchestration
 Docker	                                              Containerization of services
-PostgreSQL	                                          Stores transformed post data
+PostgreSQL	                                          Stores transformed post data and the loaded data
 MongoDB	                                              Stores transformed user data
 MySQL	                                                Stores comments and likes data
 pgAdmin                                             	PostgreSQL web UI
