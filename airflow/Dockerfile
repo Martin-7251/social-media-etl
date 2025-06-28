@@ -1,17 +1,17 @@
+# Use the official Apache Airflow image version 2.7.2 as the base image
 FROM apache/airflow:2.7.2
 
+# Switch to root user to allow system-level installations 
 USER root
 
-# Install system dependencies if needed (optional)
-# RUN apt-get update && apt-get install -y build-essential libpq-dev
-
-# Switch to airflow user before pip install
+# Switch back to airflow user (default user in airflow image) for application-level commands
 USER airflow
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-        pandas \
-        numpy \
-        pymongo \
-        mysql-connector-python \
-        psycopg2-binary
+# Upgrade pip and install required Python packages for the project
+RUN pip install --no-cache-dir --upgrade pip && \  # Upgrade pip to latest version without caching
+    pip install --no-cache-dir \                   # Install the following Python libraries:
+        pandas \                   # For data manipulation and analysis
+        numpy \                    # For numerical computations
+        pymongo \                  # For connecting to and working with MongoDB
+        mysql-connector-python \   # For connecting to MySQL databases
+        psycopg2-binary            # For connecting to PostgreSQL databases

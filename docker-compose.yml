@@ -1,106 +1,113 @@
+# Use Docker Compose version 3.8
 version: "3.8"
 
 services:
+  # MongoDB database service
   mongodb:
-    image: mongo:5.0
-    container_name: mongodb
+    image: mongo:5.0  
+    container_name: mongodb  
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_ROOT_USERNAME: admin  
+      MONGO_INITDB_ROOT_PASSWORD: pass  
     ports:
-      - "27017:27017"
+      - "27017:27017"  # Expose MongoDB port to host
     volumes:
-      - ./mongodb:/docker-entrypoint-initdb.d
-      - mongo_data:/data/db
+      - ./mongodb:/docker-entrypoint-initdb.d  # Initialize DB with scripts from local folder
+      - mongo_data:/data/db  # Persist MongoDB data in a named volume
 
+  # PostgreSQL database service
   postgres:
-    image: postgres:13
+    image: postgres:13  
     container_name: postgres
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: social_data
+      POSTGRES_USER: airflow  
+      POSTGRES_PASSWORD: airflow 
+      POSTGRES_DB: social_data  # Default database name
     ports:
-      - "5432:5432"
+      - "5432:5432"  # Expose PostgreSQL port to host
     volumes:
-      - ./postgres:/docker-entrypoint-initdb.d
-      - pg_data:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d  # Run initialization SQL scripts
+      - pg_data:/var/lib/postgresql/data  # Store PostgreSQL data persistently
 
+  # MySQL database service
   mysql:
-    image: mysql:8.0
+    image: mysql:8.0  
     container_name: mysql
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: social_data
-      MYSQL_USER: airflow
-      MYSQL_PASSWORD: airflow
+      MYSQL_ROOT_PASSWORD: root  
+      MYSQL_DATABASE: social_data  # Create a default database
+      MYSQL_USER: airflow  
+      MYSQL_PASSWORD: airflow  
     ports:
-      - "3306:3306"
+      - "3306:3306"  # Expose MySQL port to host
     volumes:
-      - ./mysql:/docker-entrypoint-initdb.d
-      - mysql_data:/var/lib/mysql
+      - ./mysql:/docker-entrypoint-initdb.d  # Run init scripts for MySQL
+      - mysql_data:/var/lib/mysql  # Persist MySQL data in a named volume
 
+  # Apache Airflow service
   airflow:
-    build: ./airflow
+    build: ./airflow  # Build Airflow image from Dockerfile in ./airflow
     container_name: airflow
-    restart: always
+    restart: always  # Always restart Airflow if it crashes
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/social_data
-      - AIRFLOW__CORE__FERNET_KEY= ZZ9xweNqbPpBoOi2ARn7aWBn3NhFB0piRCWjn2NDL50=
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__CORE__DEFAULT_TIMEZONE=Africa/Nairobi
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor  # Use LocalExecutor for parallel task execution
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/social_data  # PostgreSQL connection string
+      - AIRFLOW__CORE__FERNET_KEY= ZZ9xweNqbPpBoOi2ARn7aWBn3NhFB0piRCWjn2NDL50=  # Key for encrypting Airflow data (e.g., passwords)
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False  # Do not load default example DAGs
+      - AIRFLOW__CORE__DEFAULT_TIMEZONE=Africa/Nairobi  # Set default timezone
     depends_on:
-      - postgres
-      - mysql
-      - mongodb
+      - postgres  # Start Airflow after PostgreSQL is ready
+      - mysql     # Start Airflow after MySQL is ready
+      - mongodb   # Start Airflow after MongoDB is ready
     volumes:
-      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/dags:/opt/airflow/dags  # Mount DAGs folder for Airflow to read workflows
     ports:
-      - "8081:8080"
+      - "8081:8080"  # Expose Airflow webserver on port 8081
     command: >
       bash -c "airflow db init &&
                airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
                airflow webserver & airflow scheduler"
+      # Initialize the DB, create an admin user, and run both the webserver and scheduler
 
+  # pgAdmin - PostgreSQL GUI client
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4  # Use pgAdmin 4 image
     container_name: pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com  # Default login email
+      PGADMIN_DEFAULT_PASSWORD: admin  # Default login password
     ports:
-      - "5050:80"
+      - "5050:80"  # Access pgAdmin on localhost:5050
     volumes:
-      - pgadmin_data:/var/lib/pgadmin
+      - pgadmin_data:/var/lib/pgadmin  # Store pgAdmin session and configuration
     depends_on:
-      - postgres
+      - postgres  # Start only after PostgreSQL is ready
 
+  # Adminer - lightweight database management UI
   adminer:
-    image: adminer
+    image: adminer  # Use default Adminer image
     container_name: adminer
     ports:
-      - "8082:8080"
+      - "8082:8080"  # Access Adminer UI on port 8082
     depends_on:
-      - postgres
-      - mysql
+      - mysql     # Wait for MySQL to start
 
+  # Mongo Express - Web GUI for MongoDB
   mongo-express:
-    image: mongo-express
+    image: mongo-express  # Use official Mongo Express image
     container_name: mongo-express
     ports:
-      - "8083:8081"
-
+      - "8083:8081"  # Access Mongo Express on port 8083
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: admin
-      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongodb:27017/
-
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin  # Admin username for Mongo Express to connect
+      ME_CONFIG_MONGODB_ADMINPASSWORD: admin  # Admin password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:admin@mongodb:27017/  # MongoDB connection URI
     depends_on:
-      - mongodb
+      - mongodb  # Start after MongoDB is ready
 
+# Named volumes used for data persistence
 volumes:
-  mongo_data:
-  pg_data:
-  mysql_data:
-  pgadmin_data:
+  mongo_data:      # Persistent volume for MongoDB data
+  pg_data:         # Persistent volume for PostgreSQL data
+  mysql_data:      # Persistent volume for MySQL data
+  pgadmin_data:    # Persistent volume for pgAdmin settings
