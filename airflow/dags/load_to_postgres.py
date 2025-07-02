@@ -1,64 +1,52 @@
 # Import essential libraries
-import json                  # To convert Python dicts/lists to JSON strings for database insertion
-import psycopg2              # PostgreSQL adapter for Python
-import pandas as pd          # For reading and processing data
-import numpy as np           # For numerical operations
+import json
+import psycopg2
+import pandas as pd
+import numpy as np
 
 # Configuration dictionary for connecting to PostgreSQL
 PG_CONFIG = {
-    "host": "postgres",        # Hostname of the PostgreSQL container
-    "dbname": "social_data",   # Database name
-    "user": "airflow",         # Username
-    "password": "airflow",     # Password
-    "port": 5432               # Default PostgreSQL port
+    "host": "postgres",
+    "dbname": "social_data",
+    "user": "airflow",
+    "password": "airflow",
+    "port": 5432
 }
 
 # General-purpose function to insert a pandas DataFrame into a PostgreSQL table
 def insert_dataframe(df, table_name, schema, columns):
-    # Establish a connection to the PostgreSQL database
     conn = psycopg2.connect(**PG_CONFIG)
     cur = conn.cursor()
 
     try:
         print(f"📦 Creating table {table_name}...")
-        # Drop the table if it already exists (for clean loading)
         cur.execute(f"DROP TABLE IF EXISTS {table_name}")
-        # Create the table using the provided schema
         cur.execute(f"CREATE TABLE {table_name} ({schema})")
 
-        # Iterate over each row in the DataFrame
         for _, row in df.iterrows():
             try:
                 clean_row = []
-                # Clean/convert row values before insertion
                 for val in row[columns]:
                     if isinstance(val, (list, dict)):
-                        # Convert complex types to JSON strings
                         clean_row.append(json.dumps(val))
                     elif pd.isna(val):
-                        # Handle missing values (NaN) as NULL
                         clean_row.append(None)
                     else:
                         clean_row.append(val)
 
-                # Prepare INSERT statement with placeholders
                 placeholders = ', '.join(['%s'] * len(clean_row))
                 insert_sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders})"
-                # Execute the insert
                 cur.execute(insert_sql, tuple(clean_row))
 
             except Exception as e:
-                # Handle errors for each row separately to prevent full failure
                 print(f"❌ Failed to insert row into {table_name}: {row[columns].tolist()}")
                 print(f"Error: {e}")
-                conn.rollback()  # Roll back the current transaction to reset the state
+                conn.rollback()
 
-        # Commit all successful inserts to the database
         conn.commit()
         print(f"✅ Loaded {len(df)} rows into {table_name}")
 
     finally:
-        # Ensure the cursor and connection are closed even if an error occurs
         cur.close()
         conn.close()
 
@@ -66,11 +54,10 @@ def insert_dataframe(df, table_name, schema, columns):
 # Main function to orchestrate loading all datasets into PostgreSQL
 def run_load():
     # ---------------------- USERS ----------------------
-    df_users = pd.read_json("dags/data/User_transformed.json")  # Load transformed user data
-    df_users.columns = [col.lower() for col in df_users.columns]  # Standardize column names
-    df_users['follower_following_ratio'] = df_users['follower_following_ratio'].astype(np.int64)  # Ensure integer type
+    df_users = pd.read_json("dags/data/User_transformed.json")
+    df_users.columns = [col.lower() for col in df_users.columns]
+    df_users['follower_following_ratio'] = df_users['follower_following_ratio'].astype(np.int64)
 
-    # SQL schema and column list for users_cleaned table
     user_schema = """
         _id TEXT PRIMARY KEY,
         createdat TEXT,
@@ -93,8 +80,8 @@ def run_load():
     insert_dataframe(df_users, "users_cleaned", user_schema, user_columns)
 
     # ---------------------- POSTS ----------------------
-    df_posts = pd.read_json("dags/data/posts_transformed.json")  # Load posts data
-    df_posts.columns = [col.lower() for col in df_posts.columns]  # Standardize column names
+    df_posts = pd.read_json("dags/data/posts_transformed.json")
+    df_posts.columns = [col.lower() for col in df_posts.columns]
 
     post_schema = """
         _id TEXT PRIMARY KEY,
@@ -120,10 +107,9 @@ def run_load():
     insert_dataframe(df_posts, "posts_cleaned", post_schema, post_columns)
 
     # ---------------------- COMMENTS ----------------------
-    df_comments = pd.read_json("dags/data/postComments_transformed.json")  # Load comments data
-    df_comments.columns = [col.lower() for col in df_comments.columns]  # Standardize column names
+    df_comments = pd.read_json("dags/data/postComments_transformed.json")
+    df_comments.columns = [col.lower() for col in df_comments.columns]
 
-    # Convert float to boolean for commentliked field, if present
     if "commentliked" in df_comments.columns:
         df_comments["commentliked"] = df_comments["commentliked"].astype(bool)
 
@@ -143,19 +129,20 @@ def run_load():
     insert_dataframe(df_comments, "comments_cleaned", comment_schema, comment_columns)
 
     # ---------------------- LIKES ----------------------
-    df_likes = pd.read_json("dags/data/postLikes_transformed.json")  # Load likes data
-    df_likes.columns = [col.lower() for col in df_likes.columns]  # Standardize column names
+    df_likes = pd.read_json("dags/data/postLikes_transformed.json")
+    df_likes.columns = [col.lower() for col in df_likes.columns]
 
     likes_schema = """
-        _id TEXT PRIMARY KEY,
-        createdat BIGINT,
-        liker JSONB,
-        post JSONB
+        id TEXT PRIMARY KEY,
+        liker_id TEXT,
+        post_id TEXT,
+        createdat BIGINT
     """
-    likes_columns = ["_id", "createdat", "liker", "post"]
+    likes_columns = ["id", "liker_id", "post_id", "createdat"]
+
     insert_dataframe(df_likes, "likes_cleaned", likes_schema, likes_columns)
 
 
-# Entry point: execute run_load() if the script is run directly
+# Entry point
 if __name__ == "__main__":
     run_load()
