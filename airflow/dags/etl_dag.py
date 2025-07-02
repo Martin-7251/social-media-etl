@@ -9,7 +9,7 @@ from pendulum import timezone  # For setting the timezone
 # Default arguments for the DAG
 default_args = {
     'owner': 'airflow',  # DAG owner
-    'start_date': datetime(2024, 1, 1, tzinfo=timezone("Africa/Nairobi")),  # DAG start date with timezone
+    'start_date': datetime(2025, 7, 2, tzinfo=timezone("Africa/Nairobi")),  # DAG start date with timezone
     'retries': 1,  # Number of retries if a task fails
     'retry_delay': timedelta(minutes=5),  # Wait time between retries
 }
